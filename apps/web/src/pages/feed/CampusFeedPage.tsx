@@ -9,7 +9,9 @@ export const CampusFeedPage: React.FC = () => {
   return (
     <div className="absolute inset-0 w-full h-full bg-[#F9FAFB] flex flex-col animate-in fade-in z-30">
       <div className="bg-[#FAFAFA] px-5 py-4 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10">
-        <button className="text-[#E61E54]"><Menu className="w-6 h-6" /></button>
+        <button className="text-[#E61E54]" onClick={() => navigate('/categories')}>
+          <Menu className="w-6 h-6" />
+        </button>
         <div className="flex items-center space-x-1.5 absolute left-1/2 -translate-x-1/2">
           <Landmark className="w-5 h-5 text-[#E61E54]" strokeWidth={2} />
           <h1 className="text-[17px] font-bold text-[#E61E54] tracking-wide">경기대학교</h1>

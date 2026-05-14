@@ -29,6 +29,7 @@ import { NoticePage }      from '../pages/shared/NoticePage';
 // Profile
 import { ProfilePage }     from '../pages/profile/ProfilePage';
 import { SettingsPage }    from '../pages/profile/SettingsPage';
+import { CategoryPage }    from '../pages/shared/CategoryPage';
 
 export const AppRouter: React.FC = () => (
   <Routes>
@@ -41,7 +42,8 @@ export const AppRouter: React.FC = () => (
 
     {/* 메인 탭 */}
     <Route path="/feed"       element={<CampusFeedPage />} />
-    <Route path="/boards"     element={<BoardListPage />} />
+    <Route path="/boards"          element={<BoardListPage />} />
+    <Route path="/categories"      element={<CategoryPage />} />
     <Route path="/boards/:boardId" element={<BoardDetailPage />} />
 
     {/* 게시글 */}
