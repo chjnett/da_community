@@ -3,7 +3,7 @@
 ## 0. 문서 목적
 - 이 문서는 "다걸고"를 실제로 출시 가능한 수준으로 구현하기 위한 단일 기준 문서다.
 - 범위는 아키텍처, 데이터 모델, API 계약, 인프라, 보안, 운영, 테스트, 단계별 실행 계획까지 포함한다.
-- 기준 버전: `v1.0`
+- 기준 버전: `v1.1`
 - 기준 일자: `2026-05-14`
 
 ## 1. 제품 원칙(Product Principles)
@@ -14,12 +14,20 @@
 
 ## 2. 아키텍처 결정(ADR 요약)
 ### 2.1 하이브리드 구조
+#### 목표(Production)
 - Frontend: Cloudflare Pages + React + Tailwind
 - Edge/API Gateway: Cloudflare Workers
 - Core AI/Business: Dockerized FastAPI (LangGraph)
 - DB: Cloudflare D1
 - Object Storage: Cloudflare R2
 - Tunnel: Cloudflare Tunnel (FastAPI private origin 연결)
+
+#### 현재 구현(Local Dev, 2026-05-14)
+- Frontend: Vite dev server (`apps/web`, `:5176`)
+- API Gateway: Node 기반 `apps/worker-api` (`:8787`)
+- AI Backend: FastAPI 기반 `apps/ai-backend` (`:8000`)
+- DB: SQLite 파일(`apps/worker-api/data/dev.db`)
+- 인증: `bcrypt` 비밀번호 해시 + JWT(access/refresh)
 
 ### 2.2 결정 이유
 - Workers로 인증/라우팅/경량 로직을 처리해 지연시간을 최소화한다.
@@ -97,13 +105,25 @@ CREATE TABLE IF NOT EXISTS posts (
   author_id TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
-  images_json TEXT NOT NULL DEFAULT '[]',
-  status TEXT NOT NULL DEFAULT 'PUBLISHED', -- PUBLISHED, HIDDEN, DELETED
+  images_json TEXT NOT NULL DEFAULT '[]', -- JSON array of keys
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY(board_id) REFERENCES boards(id),
   FOREIGN KEY(author_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS replies (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  author_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY(post_id) REFERENCES posts(id),
+  FOREIGN KEY(author_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_posts_board_created ON posts(board_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_replies_post_created ON replies(post_id, created_at ASC);
 
 CREATE TABLE IF NOT EXISTS chat_rooms (
   id TEXT PRIMARY KEY,
@@ -139,7 +159,6 @@ CREATE TABLE IF NOT EXISTS ai_reviews (
   FOREIGN KEY(author_id) REFERENCES users(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_posts_board_created ON posts(board_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_author_created ON posts(author_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_room_created ON chat_msgs(room_id, created_at DESC);
 ```
@@ -303,9 +322,10 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 APP_ENV=production
 
 # Auth
-JWT_SECRET=...
-JWT_REFRESH_SECRET=...
-JWT_EXPIRES_IN=3600
+ACCESS_TOKEN_SECRET=...
+REFRESH_TOKEN_SECRET=...
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 
 # Cloudflare
 D1_DATABASE_ID=...
@@ -319,7 +339,11 @@ OPENAI_MODEL=gpt-4o-mini
 AI_REVIEW_TIMEOUT_MS=5000
 
 # Gateway -> AI Backend
-AI_BACKEND_BASE_URL=https://ai-backend.internal
+AI_BACKEND_URL=https://ai-backend.internal
+
+# Local Dev
+HOST=127.0.0.1
+PORT=8787
 ```
 
 ### 10.3 릴리즈 파이프라인(권장)
@@ -345,45 +369,38 @@ AI_BACKEND_BASE_URL=https://ai-backend.internal
   - SOFT_WARN/BLOCK 비율
 - 에러 알림: Sentry + Cloudflare 로그 기반 알림.
 
-## 13. 테스트 전략
-### 13.1 단위 테스트
+## 13. 단계별 마일스톤 및 실행 계획
+
+### 13.1 Phase 1: Core Launch Readiness (진행중 - 완료 단계)
+- [x] **Project Base**: 모노레포 구조 및 공통 설정 구축
+- [x] **Core Infra**: `worker-api` D1/SQLite 어댑터 레이어 구축
+- [x] **Auth System**: 실명 기반 회원가입/로그인 및 JWT 세션 관리
+- [x] **Content System**: 게시판 목록, 게시글 CRUD, 답글(Reply) 기능 완비
+- [x] **AI MVP**: LangGraph 기반 실시간 AI 리뷰 및 중재 파이프라인 연동
+- [ ] **Asset Infra**: Cloudflare R2 이미지 업로드 및 프리뷰 기능
+
+### 13.2 Phase 2: AI & Real-time Enhancement (대기중)
+- [ ] **Lounge 2.0**: WebSocket 기반 실시간 메시지 브로드캐스팅 서버 구현
+- [ ] **AI Deep Review**: AI Verdict에 따른 사용자 평판(Temperature) 시스템 연결
+- [ ] **Notification**: 답글/공지사항 알림 시스템 구축
+
+### 13.3 Phase 3: Scaling & Mobile (미래)
+- [ ] **Mobile App**: React Native(Expo) 기반 모바일 클라이언트 출시
+- [ ] **Multi-Campus**: 타 대학교 도메인 확장 및 멀티 테넌시 지원
+- [ ] **Reporting**: 월간 AI 커뮤니티 리포트 자동화
+
+## 14. 테스트 전략
+### 14.1 단위 테스트
 - 유효성 검증(zod/pydantic)
 - 정책 판정 함수(`OK/SOFT_WARN/BLOCK`)
 
-### 13.2 통합 테스트
+### 14.2 통합 테스트
 - Worker API + D1 CRUD
 - FastAPI AI 리뷰 체인
 
-### 13.3 E2E
+### 14.3 E2E
 - 회원가입 -> 게시글 작성 -> AI 경고 확인 -> 수정 게시
 - 채팅방 입장/메시지 송수신
-
-## 14. 단계별 실행 계획(구체화)
-### Phase 1 (1~4주): 코어 출시 준비
-1. 1주차
-- 인증 플로우/도메인 검증 구현
-- D1 1차 마이그레이션 적용(users, boards, posts)
-2. 2주차
-- 게시글 CRUD + 이미지 업로드(R2 presigned URL) 구현
-3. 3주차
-- 명찰 UI + 공개범위 설정 UI 연결
-4. 4주차
-- QA, 버그 수정, 스테이징 릴리즈
-
-### Phase 2 (5~8주): AI/실시간 기능
-1. 5주차
-- FastAPI + LangGraph 기본 체인 구축
-2. 6주차
-- 작성 화면 AI 피드백 통합
-3. 7주차
-- WebSocket 라운지 채팅 + D1 저장
-4. 8주차
-- 관리자 게시판 관리 기능, 운영자 가이드 작성
-
-### Phase 3 (9주~): 확장
-1. Expo 앱 생성 및 공통 패키지 연결
-2. 멀티 대학 코드/정책 확장
-3. 월간 AI 커뮤니티 리포트 자동화
 
 ## 15. Definition of Done (릴리즈 기준)
 - 인증, 게시글, AI 리뷰, 채팅이 모두 정상 동작한다.
@@ -391,14 +408,72 @@ AI_BACKEND_BASE_URL=https://ai-backend.internal
 - 주요 사용자 플로우 E2E 테스트 통과.
 - 운영자 매뉴얼, 장애 대응 Runbook 문서화 완료.
 
-## 16. 즉시 실행 체크리스트
-- [ ] Turborepo 초기 구조 생성
-- [ ] D1 마이그레이션 파일 작성/적용
-- [ ] Worker API 기본 라우트 및 인증 미들웨어 구현
-- [ ] FastAPI 서버/헬스체크/리뷰 API 구현
+## 16. 트러블슈팅(Troubleshooting)
+
+### 16.1 백엔드 코드 미반영 (404/에러 지속)
+- **현상**: 코드를 수정했음에도 API 응답이 예전과 같거나 404가 발생함.
+- **원인**: Node.js 프로세스가 포트(8787)를 점유한 채 종료되지 않아 최신 코드가 로드되지 않음.
+- **해결**:
+  ```bash
+  lsof -ti:8787 | xargs kill -9  # 8787 포트 강제 종료
+  npm run dev                    # 재시작
+  ```
+
+### 16.2 Pattern Match Error (Frontend)
+- **현상**: `The string did not match the expected pattern` 에러 발생.
+- **원인**: `URL` 생성 시 `baseUrl`이 유효하지 않거나, `localStorage`에 `"null"`(문자열) 형태의 토큰이 저장되어 `apiRequest`가 실패함.
+- **해결**: `httpClient.ts`에서 URL 유효성 검사 로직을 추가하고, `tokenStorage.ts`에서 `"null"`, `"undefined"` 문자열을 필터링하도록 수정.
+
+### 16.3 WebSocket 연결 실패
+- **현상**: 라운지 채팅 진입 시 WebSocket 연결이 되지 않음.
+- **원인**: WebSocket 서버가 `worker-api`(8787)에서 `ai-backend`(8000)로 이전됨에 따라 포트 불일치 발생.
+- **해결**: `socketManager.ts`의 `resolveSocketUrl` 로직에서 로컬 개발 시 `ws://127.0.0.1:8000`을 바라보도록 설정 확인.
+
+### 16.4 DB 스키마/컬럼 변경 미적용
+- **현상**: 새로운 테이블(`replies`) 접근 시 `no such table` 또는 컬럼 추가 후 `no such column: likes_count` 에러 발생.
+- **원인**: SQLite 파일이 이미 생성된 상태에서 `IF NOT EXISTS` 테이블 생성 구문만으로는 기존 구조가 업데이트되지 않음.
+- **해결**: `apps/worker-api/data/dev.db` 파일을 삭제하고 서버를 재시작하여 테이블을 자동 재생성함.
+
+### 16.5 API 라우팅 우선순위 충돌 (404 Not Found)
+- **현상**: 특정 경로(예: `/posts/:id/like`) 요청 시 404 발생.
+- **원인**: 정규식 매칭 시 광범위한 패턴(`/:id`)이 구체적인 패턴(`/:id/like`)보다 먼저 정의되어 요청을 가로챔.
+- **해결**: `server.mjs`에서 **구체적인 하위 경로를 상세조회 로직보다 상단에 배치**함.
+
+### 16.6 API/WebSocket 주소 불일치 (포트 404)
+- **현상**: 브라우저 콘솔 404 에러 및 서버 로그에 `GET /`만 찍힘. 혹은 WebSocket이 프론트엔드 포트로 연결 시도.
+- **원인**: `env.ts`에서 API 주소를 상대 경로(`/api/v1`)로 설정하면 브라우저가 백엔드(8787)가 아닌 프론트엔드 포트로 요청을 보냄.
+- **해결**: `apps/web/src/shared/config/env.ts`에서 개발 모드일 경우 백엔드 주소를 하드코딩으로 강제 지정함.
+  - API: `http://127.0.0.1:8787/api/v1`
+  - WebSocket: `ws://127.0.0.1:8000`
+
+## 17. 즉시 실행 체크리스트
+- [x] 모노레포 기본 앱 구조 확보(`apps/web`, `apps/worker-api`, `apps/ai-backend`)
+- [ ] D1 마이그레이션 파일 작성/적용 (현재는 SQLite `dev.db` 사용)
+- [x] Worker API 기본 라우트 및 인증 구현(JWT + bcrypt)
+- [x] FastAPI 서버/헬스체크/리뷰 API 구현
 - [ ] R2 업로드 경로 및 MIME 검증 적용
 - [ ] AI 리뷰 결과 저장(`ai_reviews`) 연결
-- [ ] 스테이징 배포 + E2E 1차 통과
+- [ ] Cloudflare(Workers + D1 + R2) 스테이징 배포 + E2E 1차 통과
+
+## 17. 현재 구현 통합 상태(2026-05-14 기준)
+
+### 17.1 완료된 항목
+- **인증 및 프로필**: 회원가입/로그인, JWT 기반 인증, 마이페이지 활동 통계(`stats/me`) 연동 완료.
+- **게시판 및 게시글**: 목록/상세/작성/수정/삭제, **좋아요(Like) 증가**, **답글(Replies) CRUD** 구현 완료.
+- **이미지 시스템**: Multipart 파일 업로드 및 로컬 서빙 통합 (R2 전환 준비 완료).
+- **AI 중재 로직**: 게시글/답글 작성 시 FastAPI AI 엔진 연동 및 중재 판단(OK/BLOCK) 적용.
+- **실시간 채팅**: `ai-backend`(FastAPI)를 통한 WebSocket 라운지 채팅 아키텍처 재편 완료.
+- **문서화**: `RUN_GUIDE.md`, `BEFORE_DEPLOY.md`, 트러블슈팅 가이드 완비.
+
+### 17.2 현재 제약 및 차기 작업
+- **데이터베이스**: 로컬 SQLite(`dev.db`) 환경 -> Cloudflare D1 상용 배포용 마이그레이션 필요.
+- **스토리지**: 로컬 `uploads/` 저장 -> Cloudflare R2 버킷 바인딩 전환 필요.
+- **AI 고도화**: 규칙 기반 스코어링 -> LangGraph 기반 복합 추론 엔진으로 확장 예정.
+
+### 17.3 차기 우선순위
+1. **Cloudflare D1/R2 실배포**: `wrangler`를 이용한 상용 환경 구축 및 데이터 이전.
+2. **AI 리뷰 로그 저장**: `ai_reviews` 테이블을 생성하여 모든 중재 이력을 영속적으로 저장.
+3. **사용자 경험 고도화**: 채팅방 목록화, 알림 시스템 프로토타이핑.
 
 ---
 

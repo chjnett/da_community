@@ -71,3 +71,21 @@ export default defineConfig([
   },
 ])
 ```
+
+## Dageolgo Env
+
+1. `.env.example`를 복사해 `.env.local` 생성
+2. 아래 값 채우기
+
+```bash
+cp .env.example .env.local
+```
+
+- `VITE_API_BASE_URL`: Worker Gateway base (기본값 `/api/v1`)
+- `VITE_WS_BASE_URL`: WebSocket base (예: `ws://localhost:8787/api/v1`)
+
+## Auth Session Flow
+
+- 인증 필요 라우트는 `AuthGuard`로 보호됩니다.
+- 토큰 만료 후 refresh 실패 시 `auth-expired` 이벤트를 발생시켜 로그인 화면으로 이동합니다.
+- 설정 화면 로그아웃 버튼은 API 성공/실패와 무관하게 로컬 토큰을 정리합니다.

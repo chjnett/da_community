@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Sparkles, Thermometer } from 'lucide-react';
+import { useUserStore } from '../../store/userStore';
+import { authApi } from '../../shared/api/authApi';
+import { tokenStorage } from '../../shared/api/tokenStorage';
 
 function FeatureCard({ label, title, icon }: { label: string; title: string; icon: React.ReactNode }) {
   return (
@@ -16,6 +19,27 @@ function FeatureCard({ label, title, icon }: { label: string; title: string; ico
 
 export const SplashPage: React.FC = () => {
   const navigate = useNavigate();
+  const setUser = useUserStore(state => state.setUser);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = tokenStorage.getAccessToken();
+      if (!token) return;
+
+      try {
+        const user = await authApi.getMe();
+        if (user) {
+          setUser(user);
+          navigate('/feed', { replace: true });
+        }
+      } catch (err) {
+        console.error('Auto login failed:', err);
+      }
+    };
+
+    checkAuth();
+  }, [navigate, setUser]);
+
   return (
     <div className="flex-1 w-full max-w-sm flex flex-col items-center mt-12 animate-in fade-in duration-500">
       <div className="text-center mb-16">

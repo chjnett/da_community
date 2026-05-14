@@ -1,22 +1,62 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Loader2, Sparkles } from 'lucide-react';
-import type { ReviewState } from '../../types';
+import { X } from 'lucide-react';
+import type { AiVerdict, ReviewState } from '../../types';
 import { DUMMY_POSTS } from '../../data/dummyData';
+import { useSeniorAdvice } from '../../features/ai/hooks/useSeniorAdvice';
+import { aiApi } from '../../shared/api/aiApi';
+import { postApi } from '../../shared/api/postApi';
+import { queryClient } from '../../shared/api/queryClient';
+import { AiReviewModal } from '../../components/ai/AiReviewModal';
+import { useToast } from '../../shared/ui/toast/ToastProvider';
+import { toastMessages } from '../../shared/ui/toast/toastMessages';
+import { getUserErrorMessage } from '../../shared/errors/getUserErrorMessage';
 
 export const WriteReplyPage: React.FC = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const { postId } = useParams();
   const post = DUMMY_POSTS.find(p => p.id === postId) ?? DUMMY_POSTS[0];
   const [content, setContent] = useState('');
   const [reviewState, setReviewState] = useState<ReviewState>('NONE');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalVerdict, setModalVerdict] = useState<AiVerdict | null>(null);
+  const liveAdvice = useSeniorAdvice('답글', content, { debounceMs: 1000, minLength: 10 });
 
   const isFilled = content.trim().length > 0;
 
-  const handleRegister = () => {
-    if (!isFilled) return;
+  const handleRegister = async () => {
+    if (!postId || !isFilled) return;
     setReviewState('REVIEWING');
-    setTimeout(() => setReviewState('WARNING'), 1500);
+
+    try {
+      // 1. AI 검토
+      const res = await aiApi.review({ title: '답글', content: content.trim() });
+      
+      // 2. 검토 결과 처리
+      if (res.verdict === 'OK') {
+        await postApi.createReply(postId, { content: content.trim() });
+        queryClient.invalidateQueries({ queryKey: ['post-replies', postId] });
+        toast.success(toastMessages.reply.created);
+        navigate(-1);
+        return;
+      }
+
+      setModalMessage(res.suggestion || '답글 표현을 조금 더 부드럽게 다듬어보면 좋아요.');
+      setModalVerdict(res.verdict);
+      setReviewState('WARNING');
+    } catch (err) {
+      // 우회 모드/테스트용: 실패 시에도 더미 성공 처리 가능하지만, 
+      // 여기서는 실제 API 호출을 시도하고 실패 시 에러 표시
+      toast.error(getUserErrorMessage(err, toastMessages.ai.reviewFail));
+      
+      // 테스트 편의를 위해 만약 404/서버 에러라면 강제로 등록 (선택 사항)
+      // await postApi.createReply(postId, { content: content.trim() }).catch(() => {});
+      
+      setModalMessage('AI 검토 연결이 잠시 불안정해요. 답글 표현을 한 번 더 확인해 주세요.');
+      setModalVerdict('SOFT_WARN');
+      setReviewState('WARNING');
+    }
   };
 
   return (
@@ -47,34 +87,32 @@ export const WriteReplyPage: React.FC = () => {
             value={content}
             onChange={e => setContent(e.target.value)}
           />
+          {liveAdvice.loading ? <p className="text-xs text-gray-400 mt-3">AI 선배가 답글을 확인하고 있어요...</p> : null}
+          {liveAdvice.verdict && liveAdvice.verdict !== 'OK' && liveAdvice.suggestion ? (
+            <div className={`mt-3 rounded-xl border px-3 py-2 ${liveAdvice.verdict === 'BLOCK' ? 'border-red-100 bg-red-50' : 'border-pink-100 bg-pink-50'}`}>
+              <p className={`text-xs font-medium leading-relaxed ${liveAdvice.verdict === 'BLOCK' ? 'text-red-600' : 'text-[#E61E54]'}`}>
+                {liveAdvice.suggestion}
+              </p>
+            </div>
+          ) : null}
         </div>
-        {reviewState !== 'NONE' && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 z-50 animate-in fade-in duration-200">
-            {reviewState === 'REVIEWING' ? (
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="text-gray-800 font-bold">AI 선배가 답글을 읽어보고 있어요...</p>
-              </div>
-            ) : (
-              <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgba(230,30,84,0.12)] border border-pink-100 animate-in zoom-in-95 duration-300">
-                <div className="flex items-center space-x-2 text-[#E61E54] mb-3 justify-center">
-                  <Sparkles className="w-5 h-5" />
-                  <span className="font-extrabold text-lg">AI 선배의 조언</span>
-                </div>
-                <p className="text-gray-800 font-bold text-center mb-4">최종적으로 올리기 전에 확인해주세요!</p>
-                <div className="bg-pink-50 p-4 rounded-xl border border-pink-100 mb-6">
-                  <p className="text-sm text-[#E61E54] font-medium leading-relaxed text-center">
-                    "상대방이 오해할 수 있는 단어가 포함되어 있어요. 한 번 더 따뜻하게 다듬어서 보내는 건 어떨까요?"
-                  </p>
-                </div>
-                <div className="flex flex-col space-y-2">
-                  <button onClick={() => setReviewState('NONE')} className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">수정하기</button>
-                  <button onClick={() => navigate(-1)} className="w-full py-3.5 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">그래도 답글 달기</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        <AiReviewModal
+          reviewState={reviewState}
+          verdict={modalVerdict}
+          onEdit={() => {
+            setReviewState('NONE');
+            setModalVerdict(null);
+          }}
+          onSubmit={async () => {
+            if (postId) {
+              await postApi.createReply(postId, { content: content.trim() }).catch(() => {});
+              queryClient.invalidateQueries({ queryKey: ['post-replies', postId] });
+            }
+            toast.info(toastMessages.reply.createdWithWarning);
+            navigate(-1);
+          }}
+          message={modalMessage || undefined}
+        />
       </div>
     </div>
   );

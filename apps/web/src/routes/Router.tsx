@@ -30,34 +30,41 @@ import { NoticePage }      from '../pages/shared/NoticePage';
 import { ProfilePage }     from '../pages/profile/ProfilePage';
 import { SettingsPage }    from '../pages/profile/SettingsPage';
 import { CategoryPage }    from '../pages/shared/CategoryPage';
+import { LoungePage }      from '../pages/lounge/LoungePage';
+import { AuthGuard, GuestGuard } from '../shared/auth/RouteGuards';
 
 export const AppRouter: React.FC = () => (
   <Routes>
-    {/* 온보딩 */}
-    <Route path="/"           element={<SplashPage />} />
-    <Route path="/login"      element={<LoginPage />} />
-    <Route path="/welcome"    element={<WelcomePage />} />
-    <Route path="/privacy"    element={<PrivacySetPage />} />
-    <Route path="/loading"    element={<LoadingPage />} />
+    <Route element={<GuestGuard />}>
+      {/* 온보딩 */}
+      <Route path="/"           element={<SplashPage />} />
+      <Route path="/login"      element={<LoginPage />} />
+      <Route path="/welcome"    element={<WelcomePage />} />
+      <Route path="/privacy"    element={<PrivacySetPage />} />
+      <Route path="/loading"    element={<LoadingPage />} />
+    </Route>
 
-    {/* 메인 탭 */}
-    <Route path="/feed"       element={<CampusFeedPage />} />
-    <Route path="/boards"          element={<BoardListPage />} />
-    <Route path="/categories"      element={<CategoryPage />} />
-    <Route path="/boards/:boardId" element={<BoardDetailPage />} />
+    <Route element={<AuthGuard />}>
+      {/* 메인 탭 */}
+      <Route path="/feed"       element={<CampusFeedPage />} />
+      <Route path="/boards"          element={<BoardListPage />} />
+      <Route path="/categories"      element={<CategoryPage />} />
+      <Route path="/boards/:boardId" element={<BoardDetailPage />} />
 
-    {/* 게시글 */}
-    <Route path="/posts/:postId"       element={<PostDetailPage />} />
-    <Route path="/posts/write"         element={<WritePostPage />} />
-    <Route path="/posts/:postId/reply" element={<WriteReplyPage />} />
+      {/* 게시글 */}
+      <Route path="/posts/:postId"       element={<PostDetailPage />} />
+      <Route path="/posts/write"         element={<WritePostPage />} />
+      <Route path="/posts/:postId/reply" element={<WriteReplyPage />} />
 
-    {/* 공유 */}
-    <Route path="/search"    element={<SearchPage />} />
-    <Route path="/notice"    element={<NoticePage />} />
+      {/* 공유 */}
+      <Route path="/search"    element={<SearchPage />} />
+      <Route path="/notice"    element={<NoticePage />} />
+      <Route path="/lounge/:roomId" element={<LoungePage />} />
 
-    {/* 프로필 */}
-    <Route path="/profile"          element={<ProfilePage />} />
-    <Route path="/profile/settings" element={<SettingsPage />} />
+      {/* 프로필 */}
+      <Route path="/profile"          element={<ProfilePage />} />
+      <Route path="/profile/settings" element={<SettingsPage />} />
+    </Route>
 
     {/* 기타 → 홈으로 */}
     <Route path="*" element={<Navigate to="/" replace />} />

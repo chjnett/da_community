@@ -4,10 +4,11 @@
 // ============================================================
 import React from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
-import type { ReviewState } from '../../types';
+import type { AiVerdict, ReviewState } from '../../types';
 
 interface AiReviewModalProps {
   reviewState: ReviewState;
+  verdict?: AiVerdict | null;
   onEdit: () => void;
   onSubmit: () => void;
   message?: string;
@@ -15,6 +16,7 @@ interface AiReviewModalProps {
 
 export const AiReviewModal: React.FC<AiReviewModalProps> = ({
   reviewState,
+  verdict = 'SOFT_WARN',
   onEdit,
   onSubmit,
   message = '"표현이 다소 날카롭게 들릴 수 있어요. 사실을 중심으로 조금만 더 부드럽게 다듬어보면 어떨까요? 당당한 실명 문화를 함께 만들어가요!"',
@@ -36,23 +38,28 @@ export const AiReviewModal: React.FC<AiReviewModalProps> = ({
               <span className="font-extrabold text-lg">AI 선배의 조언</span>
             </div>
             <p className="text-gray-800 font-bold mb-2">잠깐, 글을 올리기 전에 확인해볼까요?</p>
-            <div className="bg-pink-50 p-4 rounded-xl border border-pink-100 mb-6">
-              <p className="text-sm text-[#E61E54] font-medium leading-relaxed">{message}</p>
+            <div className={`${verdict === 'BLOCK' ? 'bg-red-50 border-red-100' : 'bg-pink-50 border-pink-100'} p-4 rounded-xl border mb-6`}>
+              <p className={`text-sm ${verdict === 'BLOCK' ? 'text-red-600' : 'text-[#E61E54]'} font-medium leading-relaxed`}>{message}</p>
             </div>
-            <div className="flex space-x-3">
+            <div className={`flex ${verdict === 'BLOCK' ? 'space-x-0' : 'space-x-3'}`}>
               <button
                 onClick={onEdit}
                 className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 수정하기
               </button>
-              <button
-                onClick={onSubmit}
-                className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-              >
-                그래도 올리기
-              </button>
+              {verdict !== 'BLOCK' ? (
+                <button
+                  onClick={onSubmit}
+                  className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                >
+                  그래도 올리기
+                </button>
+              ) : null}
             </div>
+            {verdict === 'BLOCK' ? (
+              <p className="text-[11px] text-red-500 font-semibold mt-3">강한 비하/조롱 표현이 감지되어 수정이 필요해요.</p>
+            ) : null}
           </div>
         )}
       </div>

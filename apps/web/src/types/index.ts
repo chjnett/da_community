@@ -47,6 +47,7 @@ export interface Notification {
 
 /** AI 리뷰 상태 */
 export type ReviewState = "NONE" | "REVIEWING" | "WARNING";
+export type AiVerdict = "OK" | "SOFT_WARN" | "BLOCK";
 
 /** 사용자 프로필 (로그인 세션용) */
 export interface UserProfile {
@@ -54,6 +55,6 @@ export interface UserProfile {
   university: string;
   dept?: string;
   sid?: string;
-  showDept: boolean;
-  showSid: boolean;
+  isDeptOpen: boolean;
+  isSidOpen: boolean;
 }
