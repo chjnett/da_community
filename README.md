@@ -3,10 +3,17 @@
 실명 기반 대학 커뮤니티 플랫폼입니다.  
 Cloudflare(Edge) + Railway(AI Backend) 하이브리드 아키텍처로 운영합니다.
 
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.1x-009688?logo=fastapi&logoColor=white)
+![Railway](https://img.shields.io/badge/Railway-Deployed-0B0D0E?logo=railway&logoColor=white)
+
 ## Table of Contents
 - [Overview](#overview)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
+- [Core API](#core-api)
 - [Monorepo Structure](#monorepo-structure)
 - [Quick Start](#quick-start)
 - [Production Status](#production-status)
@@ -53,10 +60,32 @@ Cloudflare(Edge) + Railway(AI Backend) 하이브리드 아키텍처로 운영합
 [Cloudflare D1]   [Cloudflare R2]
 ```
 
+```mermaid
+flowchart LR
+  U["User (Browser)"] --> W["Web (Cloudflare Pages)"]
+  W --> A["API (Cloudflare Workers)"]
+  A --> D["D1 (Cloudflare SQL)"]
+  A --> R["R2 (Cloudflare Object Storage)"]
+  A --> AI["AI Backend (Railway/FastAPI)"]
+  AI --> O["OpenAI API"]
+```
+
 핵심 포인트:
 - 클라이언트는 Worker API를 단일 진입점으로 사용
 - Worker는 인증/게시판/알림/통계를 처리하고 AI 백엔드와 연동
 - AI 백엔드는 검토 결과를 반환하며, Worker가 최종 정책(차단/경고/강행 등록)을 적용
+
+## Core API
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/login` | 로그인 및 토큰 발급 |
+| `POST` | `/api/v1/auth/refresh` | 액세스 토큰 갱신 |
+| `GET` | `/api/v1/auth/me` | 내 프로필 조회 |
+| `GET` | `/api/v1/stats/me` | 내 통계 조회 (레거시 호환) |
+| `GET` | `/api/v1/notifications` | 내 알림 목록 조회 |
+| `POST` | `/api/v1/posts` | 게시글 생성 (`forcePublish` 지원) |
+| `POST` | `/api/v1/posts/:id/replies` | 댓글 생성 (`forcePublish` 지원) |
+| `POST` | `/api/v1/ai/review` | AI 텍스트 검토 |
 
 ## Monorepo Structure
 ```text
