@@ -1,30 +1,26 @@
-# AI Backend (FastAPI)
+# AI Backend (`apps/ai-backend`)
 
-## Env
+## 역할
+- 텍스트 AI 검토 (`/api/v1/ai/review`)
+- WebSocket 채팅 이벤트 브로드캐스팅
 
+## 실행
 ```bash
-cp .env.example .env
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Run
+## 환경변수
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (default: `gpt-4o-mini`)
+- `PORT`
 
-```bash
-../../venv/bin/pip install -r requirements.txt
-set -a; source .env; set +a
-../../venv/bin/uvicorn app.main:app --host ${HOST:-127.0.0.1} --port ${PORT:-8000}
-```
-
-## Endpoints
+## 확인
 - `GET /health`
 - `POST /api/v1/ai/review`
 
----
-
-## 2026-05-16 업데이트
-
-- Worker 인증 흐름 안정화: `POST /api/v1/auth/refresh` 라우트 추가(토큰 갱신 404 해결)
-- 알림 API 안정화: D1 어댑터 `notifications` 메서드 보강 + 마이그레이션 반영
-- 프로필/통계 호환성: `/api/v1/auth/me` 응답에 `id` 포함, `/api/v1/stats/me` 레거시 경로 호환 추가
-- AI 검토 정책 강화: 욕설 외 비난/조롱/낙인성 표현까지 `SOFT_WARN/BLOCK` 범위 확장
-- 작성 UX 개선: 경고/차단 시 `수정하기`와 `그래도 올리기(forcePublish)` 선택 가능
-- 운영 점검 결과: Railway AI 백엔드는 응답 중이나, OpenAI 키 실사용 여부는 Railway 최신 배포/환경변수 확인이 필요
+## 상태 메모
+- fallback 규칙 강화(욕설 + 비난/낙인 표현)
+- Railway 배포본이 최신 로직인지 별도 확인 필요

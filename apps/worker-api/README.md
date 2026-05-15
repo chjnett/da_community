@@ -1,31 +1,31 @@
-# Worker API (Gateway)
+# Worker API (`apps/worker-api`)
 
-## Env
+## 역할
+- 인증, 게시판/게시글/댓글 API
+- D1 DB 접근
+- R2 파일 업로드
+- AI 백엔드 연동 게이트웨이
 
-```bash
-cp .env.example .env
-```
-
-## Run
-
+## 실행
 ```bash
 npm install
 npm run dev
 ```
 
-## Notes
-- `AI_BACKEND_URL` points to FastAPI backend.
-- `DB_DRIVER=sqlite|d1` (`sqlite` for local dev).
-- `.env` is auto-loaded by `server.mjs`.
-- `d1` mode requires Cloudflare Workers D1 binding (`DB`).
+## 배포
+```bash
+npx wrangler d1 migrations apply dageolgo-db --remote
+npx wrangler deploy
+```
 
----
+## 주요 엔드포인트
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/notifications`
+- `GET /api/v1/auth/stats`
+- `GET /api/v1/stats/me` (레거시 호환)
 
-## 2026-05-16 업데이트
-
-- Worker 인증 흐름 안정화: `POST /api/v1/auth/refresh` 라우트 추가(토큰 갱신 404 해결)
-- 알림 API 안정화: D1 어댑터 `notifications` 메서드 보강 + 마이그레이션 반영
-- 프로필/통계 호환성: `/api/v1/auth/me` 응답에 `id` 포함, `/api/v1/stats/me` 레거시 경로 호환 추가
-- AI 검토 정책 강화: 욕설 외 비난/조롱/낙인성 표현까지 `SOFT_WARN/BLOCK` 범위 확장
-- 작성 UX 개선: 경고/차단 시 `수정하기`와 `그래도 올리기(forcePublish)` 선택 가능
-- 운영 점검 결과: Railway AI 백엔드는 응답 중이나, OpenAI 키 실사용 여부는 Railway 최신 배포/환경변수 확인이 필요
+## 운영 메모
+- 알림 500 이슈: D1 어댑터 메서드 누락 및 notifications 테이블 미존재 문제 해결됨
+- signup 500 이슈: `users.role` 컬럼 마이그레이션으로 해결됨
