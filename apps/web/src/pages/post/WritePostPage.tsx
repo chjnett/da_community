@@ -1,19 +1,24 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { AiReviewModal } from '../../components/ai/AiReviewModal';
 import type { AiVerdict, ReviewState } from '../../types';
 import { aiApi } from '../../shared/api/aiApi';
 import { postApi } from '../../shared/api/postApi';
+import { boardApi } from '../../shared/api/boardApi';
 import { fileApi } from '../../shared/api/fileApi';
 import { useSeniorAdvice } from '../../features/ai/hooks/useSeniorAdvice';
 import { useToast } from '../../shared/ui/toast/ToastProvider';
 import { useUserStore } from '../../store/userStore';
 import { toastMessages } from '../../shared/ui/toast/toastMessages';
 import { getUserErrorMessage } from '../../shared/errors/getUserErrorMessage';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export const WritePostPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const boardSlug = searchParams.get('board') || 'free';
   const toast = useToast();
   const { user } = useUserStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,6 +28,16 @@ export const WritePostPage: React.FC = () => {
   const [images,      setImages]      = useState<string[]>([]); // R2 object keys
   const [previews,    setPreviews]    = useState<string[]>([]); // Local URLs
   const [uploading,   setUploading]   = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 게시판 목록을 가져와서 현재 슬러그에 맞는 ID 찾기
+  const { data: boards } = useQuery({
+    queryKey: ['boards'],
+    queryFn: () => boardApi.listBoards(),
+  });
+
+  const currentBoard = boards?.find(b => b.slug === boardSlug) || boards?.[0];
+  const boardId = currentBoard?.id || 1;
   
   const [reviewState, setReviewState] = useState<ReviewState>('NONE');
   const [modalMessage, setModalMessage] = useState('');
@@ -66,10 +81,7 @@ export const WritePostPage: React.FC = () => {
       const res = await aiApi.review({ title: title.trim(), content: content.trim() });
 
       if (res.verdict === 'OK') {
-        // 실제 게시글 생성 로직 (Phase 1 마무리)
-        // await postApi.create({ title, content, images });
-        toast.success(toastMessages.post.created);
-        navigate(-1);
+        await submitPost();
         return;
       }
 
@@ -86,14 +98,25 @@ export const WritePostPage: React.FC = () => {
     }
   };
 
-  const submitPost = async () => {
+  const submitPost = async (forcePublish = false) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      // boardId는 현재 게시판 슬러그에 따라 결정되지만, 테스트를 위해 1(자유게시판)로 고정하거나 유동적으로 설정
-      await postApi.create({ boardId: 1, title, content, images });
+      await postApi.create({ 
+        boardId, 
+        title: title.trim(), 
+        content: content.trim(), 
+        images,
+        forcePublish,
+      });
       toast.success(toastMessages.post.created);
+      queryClient.invalidateQueries({ queryKey: ['campus-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['board-posts'] });
       navigate(-1);
     } catch (err) {
       toast.error(getUserErrorMessage(err, '게시글 등록에 실패했습니다.'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -114,26 +137,33 @@ export const WritePostPage: React.FC = () => {
       </div>
       <div className="flex-1 p-5 flex flex-col overflow-y-auto">
         {/* 명찰 미리보기 (가이드 8.3 준수) */}
-        <div className="mb-8 flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-          <div className="w-10 h-10 bg-white rounded-full border border-gray-200 flex items-center justify-center text-primary shadow-sm">
-            <span className="text-xs font-bold">{user?.realName?.[0]}</span>
+        <div className="mb-8 flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-full border border-gray-200 flex items-center justify-center text-primary shadow-sm">
+              <span className="text-xs font-bold">{user?.realName?.[0]}</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-gray-900">{user?.realName}</span>
+                <span className="text-[10px] text-gray-400 font-medium">로 게시됩니다</span>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                {user?.isDeptOpen && user?.dept ? (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-pink-50 text-[#E61E54] rounded-md font-bold">{user.dept}</span>
+                ) : null}
+                {user?.isSidOpen && user?.sid ? (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-pink-50 text-[#E61E54] rounded-md font-bold">{user.sid}학번</span>
+                ) : null}
+                {!user?.isDeptOpen && !user?.isSidOpen && (
+                  <span className="text-[10px] text-gray-400">학과/학번 비공개</span>
+                )}
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-gray-900">{user?.realName}</span>
-              <span className="text-[10px] text-gray-400 font-medium">로 게시됩니다</span>
-            </div>
-            <div className="flex items-center gap-1 mt-0.5">
-              {user?.isDeptOpen && user?.dept ? (
-                <span className="text-[10px] px-1.5 py-0.5 bg-pink-50 text-[#E61E54] rounded-md font-bold">{user.dept}</span>
-              ) : null}
-              {user?.isSidOpen && user?.sid ? (
-                <span className="text-[10px] px-1.5 py-0.5 bg-pink-50 text-[#E61E54] rounded-md font-bold">{user.sid}학번</span>
-              ) : null}
-              {!user?.isDeptOpen && !user?.isSidOpen && (
-                <span className="text-[10px] text-gray-400">학과/학번 비공개</span>
-              )}
-            </div>
+          {/* AI 상태 표시 배지 */}
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-full border border-gray-100 shadow-sm self-start">
+            <div className={`w-1.5 h-1.5 rounded-full ${liveAdvice.loading ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">AI Safe</span>
           </div>
         </div>
 
@@ -233,7 +263,7 @@ export const WritePostPage: React.FC = () => {
           setReviewState('NONE');
           setModalVerdict(null);
         }}
-        onSubmit={submitPost}
+        onSubmit={() => submitPost(true)}
         message={modalMessage || undefined}
       />
     </div>

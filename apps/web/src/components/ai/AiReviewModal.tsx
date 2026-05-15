@@ -41,25 +41,21 @@ export const AiReviewModal: React.FC<AiReviewModalProps> = ({
             <div className={`${verdict === 'BLOCK' ? 'bg-red-50 border-red-100' : 'bg-pink-50 border-pink-100'} p-4 rounded-xl border mb-6`}>
               <p className={`text-sm ${verdict === 'BLOCK' ? 'text-red-600' : 'text-[#E61E54]'} font-medium leading-relaxed`}>{message}</p>
             </div>
-            <div className={`flex ${verdict === 'BLOCK' ? 'space-x-0' : 'space-x-3'}`}>
+            <div className="flex space-x-3">
               <button
                 onClick={onEdit}
                 className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 수정하기
               </button>
-              {verdict !== 'BLOCK' ? (
-                <button
-                  onClick={onSubmit}
-                  className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-                >
-                  그래도 올리기
-                </button>
-              ) : null}
+              <button
+                onClick={onSubmit}
+                className="flex-1 py-3.5 rounded-xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              >
+                그래도 올리기
+              </button>
             </div>
-            {verdict === 'BLOCK' ? (
-              <p className="text-[11px] text-red-500 font-semibold mt-3">강한 비하/조롱 표현이 감지되어 수정이 필요해요.</p>
-            ) : null}
+            {verdict === 'BLOCK' ? <p className="text-[11px] text-red-500 font-semibold mt-3">강한 표현이 감지됐어요. 그래도 올리기를 누르면 강행 등록됩니다.</p> : null}
           </div>
         )}
       </div>

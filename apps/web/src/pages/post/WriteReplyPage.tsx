@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { AiVerdict, ReviewState } from '../../types';
-import { DUMMY_POSTS } from '../../data/dummyData';
 import { useSeniorAdvice } from '../../features/ai/hooks/useSeniorAdvice';
 import { aiApi } from '../../shared/api/aiApi';
 import { postApi } from '../../shared/api/postApi';
@@ -12,16 +11,27 @@ import { useToast } from '../../shared/ui/toast/ToastProvider';
 import { toastMessages } from '../../shared/ui/toast/toastMessages';
 import { getUserErrorMessage } from '../../shared/errors/getUserErrorMessage';
 
+import { useQuery } from '@tanstack/react-query';
+
 export const WriteReplyPage: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { postId } = useParams();
-  const post = DUMMY_POSTS.find(p => p.id === postId) ?? DUMMY_POSTS[0];
+
+  // 실제 게시글 정보 가져오기
+  const { data: post } = useQuery({
+    queryKey: ['post', postId],
+    queryFn: () => postId ? postApi.getById(postId) : null,
+    enabled: !!postId,
+  });
+
   const [content, setContent] = useState('');
   const [reviewState, setReviewState] = useState<ReviewState>('NONE');
   const [modalMessage, setModalMessage] = useState('');
   const [modalVerdict, setModalVerdict] = useState<AiVerdict | null>(null);
-  const liveAdvice = useSeniorAdvice('답글', content, { debounceMs: 1000, minLength: 10 });
+  
+  // AI 선배 조언 훅 (글자 수 제한을 5자로 완화하여 더 빨리 반응하게 함)
+  const liveAdvice = useSeniorAdvice('답글', content, { debounceMs: 800, minLength: 5 });
 
   const isFilled = content.trim().length > 0;
 
@@ -37,6 +47,7 @@ export const WriteReplyPage: React.FC = () => {
       if (res.verdict === 'OK') {
         await postApi.createReply(postId, { content: content.trim() });
         queryClient.invalidateQueries({ queryKey: ['post-replies', postId] });
+        queryClient.invalidateQueries({ queryKey: ['post', postId] });
         toast.success(toastMessages.reply.created);
         navigate(-1);
         return;
@@ -76,9 +87,16 @@ export const WriteReplyPage: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 p-5 flex flex-col">
-          <div className="flex items-center space-x-2 text-xs text-gray-500 mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <span className="font-bold text-[#3A001E]">{post.author.realName}</span>
-            <span>님에게 답장하는 중</span>
+          <div className="flex items-center justify-between mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="flex items-center space-x-2 text-xs text-gray-500">
+              <span className="font-bold text-[#3A001E]">{post?.author.realName || '...'}</span>
+              <span>님에게 답장하는 중</span>
+            </div>
+            {/* AI 상태 표시 배지 */}
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white rounded-full border border-gray-100 shadow-sm">
+              <div className={`w-1.5 h-1.5 rounded-full ${liveAdvice.loading ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
+              <span className="text-[10px] font-bold text-gray-400">AI Safety</span>
+            </div>
           </div>
           <textarea
             autoFocus
@@ -104,12 +122,16 @@ export const WriteReplyPage: React.FC = () => {
             setModalVerdict(null);
           }}
           onSubmit={async () => {
-            if (postId) {
-              await postApi.createReply(postId, { content: content.trim() }).catch(() => {});
+            if (!postId) return;
+            try {
+              await postApi.createReply(postId, { content: content.trim(), forcePublish: true });
               queryClient.invalidateQueries({ queryKey: ['post-replies', postId] });
+              queryClient.invalidateQueries({ queryKey: ['post', postId] });
+              toast.info(toastMessages.reply.createdWithWarning);
+              navigate(-1);
+            } catch (err) {
+              toast.error(getUserErrorMessage(err, '답글 등록에 실패했습니다.'));
             }
-            toast.info(toastMessages.reply.createdWithWarning);
-            navigate(-1);
           }}
           message={modalMessage || undefined}
         />

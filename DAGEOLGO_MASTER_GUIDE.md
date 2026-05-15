@@ -35,30 +35,19 @@
 - **D1/R2**: Cloudflare 네이티브 데이터 솔루션으로 비용 효율적인 서버리스 데이터 관리.
 
 
-## 3. 모노레포 구조 제안(Turborepo)
+## 3. 모노레포 구조(Turborepo - 최신)
 ```txt
 repo/
   apps/
-    web/                  # React + Vite + Tailwind
-    worker-api/           # Cloudflare Worker (auth/gateway/chat)
-    ai-backend/           # FastAPI + LangGraph
+    web/                  # React + Vite + TanStack Query
+    worker-api/           # Node.js Backend (SQLite/D1)
+    ai-backend/           # FastAPI (Dockerized)
   packages/
-    ui/                   # 공용 UI 컴포넌트 (웹/앱 공유)
-    core/                 # 타입, DTO, 유효성 스키마(zod)
-    api-client/           # 공용 API SDK (fetch wrapper)
-    config/               # eslint/tsconfig/shared constants
+    core/                 # [NEW] 공유 타입, Zod 스키마, 공통 상수 (@dageolgo/core)
   infra/
-    d1/
-      migrations/         # SQL migration
-      seeds/              # 초기 데이터
-    docker/
-      ai-backend.Dockerfile
-    tunnel/
-      cloudflared-config.yml
-  docs/
-    ADR/
-    API/
-  .github/workflows/
+    docker/               # Dockerfile 및 컨테이너 설정
+  RUN_GUIDE.md            # 통합 실행 가이드
+  DAGEOLGO_MASTER_GUIDE.md # 본 문서
 ```
 
 ## 4. 도메인 모델 및 정책
@@ -372,18 +361,17 @@ PORT=8787
 
 ## 13. 단계별 마일스톤 및 실행 계획
 
-### 13.1 Phase 1: Core Launch Readiness (진행중 - 완료 단계)
-- [x] **Project Base**: 모노레포 구조 및 공통 설정 구축
-- [x] **Core Infra**: `worker-api` D1/SQLite 어댑터 레이어 구축
-- [x] **Auth System**: 실명 기반 회원가입/로그인 및 JWT 세션 관리
-- [x] **Content System**: 게시판 목록, 게시글 CRUD, 답글(Reply) 기능 완비
-- [x] **AI MVP**: LangGraph 기반 실시간 AI 리뷰 및 중재 파이프라인 연동
-- [ ] **Asset Infra**: Cloudflare R2 이미지 업로드 및 프리뷰 기능
+### 13.1 Phase 1: Core Launch Readiness (완료)
+- [x] **Project Base**: 모노레포 구조 및 `@dageolgo/core` 패키지 분리 완료
+- [x] **Auth System**: 실제 백엔드 연동(더미 제거), 이메일 기반 가입/로그인 완비
+- [x] **Content System**: 게시판 목록/상세/작성, **관리자용 게시판 추가 탭** 구현
+- [x] **Real-time**: 5초 자동 갱신 피드 및 데이터 무효화(Invalidate) 기반 즉시 반영
+- [x] **Notification**: 댓글/좋아요 실시간 알림 연동 및 읽음 처리 기능
 
-### 13.2 Phase 2: AI & Real-time Enhancement (대기중)
-- [ ] **Lounge 2.0**: WebSocket 기반 실시간 메시지 브로드캐스팅 서버 구현
-- [ ] **AI Deep Review**: AI Verdict에 따른 사용자 평판(Temperature) 시스템 연결
-- [ ] **Notification**: 답글/공지사항 알림 시스템 구축
+### 13.2 Phase 2: AI & Infra Scale-out (진행중)
+- [ ] **Asset Infra**: Cloudflare R2 이미지 업로드 전환 (현재 로컬 저장)
+- [ ] **DB Migration**: SQLite -> Cloudflare D1 상용 배포용 스키마 전송
+- [ ] **Lounge 2.0**: WebSocket 채팅 서버 안정화 및 방 목록화
 
 ### 13.3 Phase 3: Scaling & Mobile (미래)
 - [ ] **Mobile App**: React Native(Expo) 기반 모바일 클라이언트 출시
@@ -449,22 +437,21 @@ PORT=8787
 
 ## 17. 즉시 실행 체크리스트
 - [x] 모노레포 기본 앱 구조 확보(`apps/web`, `apps/worker-api`, `apps/ai-backend`)
-- [ ] D1 마이그레이션 파일 작성/적용 (현재는 SQLite `dev.db` 사용)
+- [x] D1 마이그레이션 파일 작성/적용 (현재는 SQLite `dev.db` 사용)
 - [x] Worker API 기본 라우트 및 인증 구현(JWT + bcrypt)
 - [x] FastAPI 서버/헬스체크/리뷰 API 구현
 - [ ] R2 업로드 경로 및 MIME 검증 적용
-- [ ] AI 리뷰 결과 저장(`ai_reviews`) 연결
+- [x] AI 리뷰 결과 저장(`ai_reviews`) 연결
 - [ ] Cloudflare(Workers + D1 + R2) 스테이징 배포 + E2E 1차 통과
 
-## 17. 현재 구현 통합 상태(2026-05-14 기준)
+## 17. 현재 구현 통합 상태(2026-05-15 기준)
 
 ### 17.1 완료된 항목
-- **인증 및 프로필**: 회원가입/로그인, JWT 기반 인증, 마이페이지 활동 통계(`stats/me`) 연동 완료.
-- **게시판 및 게시글**: 목록/상세/작성/수정/삭제, **좋아요(Like) 증가**, **답글(Replies) CRUD** 구현 완료.
-- **이미지 시스템**: Multipart 파일 업로드 및 로컬 서빙 통합 (R2 전환 준비 완료).
-- **AI 중재 로직**: 게시글/답글 작성 시 FastAPI AI 엔진 연동 및 중재 판단(OK/BLOCK) 적용.
-- **실시간 채팅**: `ai-backend`(FastAPI)를 통한 WebSocket 라운지 채팅 아키텍처 재편 완료.
-- **문서화**: `RUN_GUIDE.md`, `BEFORE_DEPLOY.md`, 트러블슈팅 가이드 완비.
+- **아키텍처**: `@dageolgo/core` 패키지를 통한 프론트-백엔드 타입 공유 (Type-safe 개발 환경)
+- **인증 및 프로필**: 실제 API 연동 완료, 프로필 내 활동 통계 및 커뮤니티 온도 실시간 반영.
+- **게시판 관리**: 일반 사용자는 게시판 조회, **관리자는 새로운 게시판 직접 생성(Slug/Description 포함)** 가능.
+- **알림 시스템**: `NoticePage` 실제 데이터 연동 완료, 읽지 않은 알림 표시 및 게시글 이동 연동.
+- **실시간 피드**: 새로고침 없이 5초마다 새 글 로드, 내 글 작성 시 즉시 목록 상단 노출.
 
 ### 17.2 현재 제약 및 차기 작업
 - **데이터베이스**: 로컬 SQLite(`dev.db`) 환경 -> Cloudflare D1 상용 배포용 마이그레이션 필요.
@@ -473,10 +460,21 @@ PORT=8787
 
 ### 17.3 차기 우선순위
 1. **Cloudflare D1/R2 실배포**: `wrangler`를 이용한 상용 환경 구축 및 데이터 이전.
-2. **AI 리뷰 로그 저장**: `ai_reviews` 테이블을 생성하여 모든 중재 이력을 영속적으로 저장.
-3. **사용자 경험 고도화**: 채팅방 목록화, 알림 시스템 프로토타이핑.
+2. **배포 환경 보안**: 환경 변수(`.env`) 암호화 및 Cloudflare Secrets 설정.
+3. **사용자 경험 고도화**: 채팅방 목록화, 대학교 도메인 추가 확장.
 
 ---
 
 문서 소유자: `제품/개발 리드`
 검토 주기: `주 1회`
+
+---
+
+## 2026-05-16 업데이트
+
+- Worker 인증 흐름 안정화: `POST /api/v1/auth/refresh` 라우트 추가(토큰 갱신 404 해결)
+- 알림 API 안정화: D1 어댑터 `notifications` 메서드 보강 + 마이그레이션 반영
+- 프로필/통계 호환성: `/api/v1/auth/me` 응답에 `id` 포함, `/api/v1/stats/me` 레거시 경로 호환 추가
+- AI 검토 정책 강화: 욕설 외 비난/조롱/낙인성 표현까지 `SOFT_WARN/BLOCK` 범위 확장
+- 작성 UX 개선: 경고/차단 시 `수정하기`와 `그래도 올리기(forcePublish)` 선택 가능
+- 운영 점검 결과: Railway AI 백엔드는 응답 중이나, OpenAI 키 실사용 여부는 Railway 최신 배포/환경변수 확인이 필요
