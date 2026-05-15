@@ -1,26 +1,93 @@
 # Dageolgo
 
-실명 기반 대학 커뮤니티 프로젝트입니다.
+실명 기반 대학 커뮤니티 플랫폼입니다.  
+Cloudflare(Edge) + Railway(AI Backend) 하이브리드 아키텍처로 운영합니다.
 
-## 개요
-- Frontend: `apps/web` (React + Vite)
-- API: `apps/worker-api` (Cloudflare Workers + D1 + R2)
-- AI Backend: `apps/ai-backend` (FastAPI, Railway)
+## Table of Contents
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Monorepo Structure](#monorepo-structure)
+- [Quick Start](#quick-start)
+- [Production Status](#production-status)
+- [Documentation](#documentation)
 
-## 현재 상태 (2026-05-16)
-- 인증 갱신: `POST /api/v1/auth/refresh` 지원
-- 알림 API: `GET /api/v1/notifications` 안정화
-- 프로필/통계: `/api/v1/auth/me`에 `id` 포함, `/api/v1/stats/me` 레거시 경로 호환
-- AI 검토: 욕설뿐 아니라 비난/낙인성 표현까지 검토 강화
-- 작성 UX: 경고/차단 시 `수정하기` / `그래도 올리기(forcePublish)` 선택 가능
+## Overview
+- 실명 기반 커뮤니티 (책임 있는 발화)
+- 게시글/댓글 AI 검토
+- 알림/인증/통계 API 제공
+- Edge 배포 기반의 빠른 응답
 
-## 빠른 시작
+## Tech Stack
+### Frontend
+- React
+- TypeScript
+- Vite
+- TanStack Query
+- Zustand
+
+### Backend
+- Cloudflare Workers (API Gateway)
+- Cloudflare D1 (Database)
+- Cloudflare R2 (Object Storage)
+- FastAPI (AI Backend)
+- OpenAI API (AI moderation)
+
+### Infra
+- Cloudflare Pages (Web)
+- Railway (AI Backend hosting)
+- GitHub Actions / GitHub-based deployment flow
+
+## Architecture
+```text
+[Browser]
+   |
+   v
+[Cloudflare Pages: apps/web]
+   |
+   v
+[Cloudflare Workers: apps/worker-api]
+   |                 \
+   |                  \--> [Railway: apps/ai-backend (FastAPI + OpenAI)]
+   v
+[Cloudflare D1]   [Cloudflare R2]
+```
+
+핵심 포인트:
+- 클라이언트는 Worker API를 단일 진입점으로 사용
+- Worker는 인증/게시판/알림/통계를 처리하고 AI 백엔드와 연동
+- AI 백엔드는 검토 결과를 반환하며, Worker가 최종 정책(차단/경고/강행 등록)을 적용
+
+## Monorepo Structure
+```text
+apps/
+  web/          # React client
+  worker-api/   # Cloudflare Worker API
+  ai-backend/   # FastAPI AI backend
+packages/
+  ...           # shared packages (if any)
+infra/
+  ...           # migrations / infra helpers
+```
+
+## Quick Start
 ```bash
 npm install
 npm run dev
 ```
 
-## 문서
+서비스별 실행은 [RUN_GUIDE.md](./RUN_GUIDE.md)를 참고하세요.
+
+## Production Status
+2026-05-16 기준:
+- `POST /api/v1/auth/refresh` 지원 (세션 갱신 경로 정상화)
+- `GET /api/v1/notifications` 안정화
+- `/api/v1/auth/me` 응답에 `id` 포함
+- `/api/v1/stats/me` 레거시 경로 호환
+- AI 검토 정책 강화 (욕설 + 비난/낙인성 표현)
+- 경고/차단 시 `수정하기` / `그래도 올리기(forcePublish)` UX 지원
+
+## Documentation
 - 실행 가이드: [RUN_GUIDE.md](./RUN_GUIDE.md)
 - 배포 가이드: [DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)
 - 배포 전 체크리스트: [BEFORE_DEPLOY.md](./BEFORE_DEPLOY.md)
