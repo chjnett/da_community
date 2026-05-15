@@ -1,12 +1,18 @@
-from __future__ import annotations
-
+import os
 from uuid import uuid4
 from datetime import datetime
 from typing import List, Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title='dageolgo-ai-backend', version='0.1.0')
+
+# OpenAI 설정 (환경변수 기반)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # --- Models ---
 class AiReviewRequest(BaseModel):
@@ -55,6 +61,13 @@ manager = ConnectionManager()
 
 # --- Logic ---
 def _review_text(content: str) -> AiReviewResponse:
+    # 1. OpenAI API Key가 있는 경우 고급 분석 수행 (구조만 구현)
+    if OPENAI_API_KEY:
+        # TODO: 실제 OpenAI SDK를 사용한 LangGraph/LLM 로직 호출
+        # 예: result = run_langgraph_review(content)
+        pass
+
+    # 2. 기본 키워드 스코어링 방식 (Fallback)
     text = content.lower()
     hard_words = ['죽', '병신', '꺼져', '혐오', '멍청']
     soft_words = ['짜증', '빡치', '화난', '극혐']

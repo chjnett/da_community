@@ -13,26 +13,27 @@
 - 초기 타겟은 경기대학교(`kyonggi.ac.kr`)이며, 멀티 대학 확장을 전제로 설계한다.
 
 ## 2. 아키텍처 결정(ADR 요약)
-### 2.1 하이브리드 구조
+### 2.1 하이브리드 구조 (Cloudflare + Railway)
 #### 목표(Production)
-- Frontend: Cloudflare Pages + React + Tailwind
-- Edge/API Gateway: Cloudflare Workers
-- Core AI/Business: Dockerized FastAPI (LangGraph)
-- DB: Cloudflare D1
-- Object Storage: Cloudflare R2
-- Tunnel: Cloudflare Tunnel (FastAPI private origin 연결)
+- **Frontend**: Cloudflare Pages (React + Tailwind)
+- **Edge/API Gateway**: Cloudflare Workers
+- **Core AI/Business**: **Railway (Dockerized FastAPI + LangGraph)**
+- **DB**: Cloudflare D1 (SQL)
+- **Object Storage**: Cloudflare R2 (Files)
+- **Network**: Cloudflare Tunnel (Railway 가상 사설망 연결 최적화)
 
 #### 현재 구현(Local Dev, 2026-05-14)
-- Frontend: Vite dev server (`apps/web`, `:5176`)
+- Frontend: Vite dev server (`apps/web`, `:5173`)
 - API Gateway: Node 기반 `apps/worker-api` (`:8787`)
 - AI Backend: FastAPI 기반 `apps/ai-backend` (`:8000`)
 - DB: SQLite 파일(`apps/worker-api/data/dev.db`)
 - 인증: `bcrypt` 비밀번호 해시 + JWT(access/refresh)
 
 ### 2.2 결정 이유
-- Workers로 인증/라우팅/경량 로직을 처리해 지연시간을 최소화한다.
-- LangGraph가 필요한 복합 AI 플로우는 FastAPI로 분리해 유지보수성과 관측성을 확보한다.
-- D1/R2로 Cloudflare 생태계에 일원화해 운영 복잡도를 낮춘다.
+- **Cloudflare**: 글로벌 에지 인프라를 통해 정적 자산과 가벼운 API 로직을 최저 지연시간으로 처리.
+- **Railway**: Docker 컨테이너 환경을 제공하여 복잡한 Python 의존성이 필요한 AI 추론 엔진을 안정적으로 운영.
+- **D1/R2**: Cloudflare 네이티브 데이터 솔루션으로 비용 효율적인 서버리스 데이터 관리.
+
 
 ## 3. 모노레포 구조 제안(Turborepo)
 ```txt
